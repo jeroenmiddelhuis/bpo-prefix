@@ -5,6 +5,7 @@ from enum import Enum, auto
 from collections import deque
 import random
 import json
+from gensim.models import Word2Vec
 
 class Event:
     def __init__(self, event_type, moment, task=None, resource=None):
@@ -221,7 +222,12 @@ class Simulator:
 
     def sample_processing_time(self, resource, task):
         return random.expovariate(1/self.resource_pools[task][resource][0])
-
+        
+    def embed_prefix(self, prefix):
+        model = Word2Vec.load('tasks_word2vec.model')
+        embedded_prefix = np.mean([model.wv[task] for task in prefix], axis=0)
+        return embedded_prefix
+        
     def get_state(self):
         ### Resource binary, busy time, assigned to + nr of each task
         resources_available = [1 if x in self.available_resources else 0 for x in self.resources]
@@ -239,7 +245,33 @@ class Simulator:
         else:
             task_types_num = [0.0 for el in self.task_types if el != 'Start']
 
-        return np.array(resources_available + resources_assigned + task_types_num)
+        #in case alle task assigments bekijken, nadat alle zijn bekeken doorgaan naar volgende case.
+
+
+        if 1 in self.uncompleted_cases: #Case als argument in get_state zodat dit dynamisch wordt
+            case = self.uncompleted_cases[1]
+            prefix = case.completed_tasks
+            embedded_prefix = self.embed_prefix(prefix)
+
+        sorted_case_ids = sorted(self.uncompleted_cases.keys())
+        current_index = sorted_case_ids.index(current_case_id) #zelfde hier, aanpassen naar current case id
+
+        next_case_embeddings = [] #Zelfde hier, aanpassen naar current case id
+        for case in range(current_index + 1, min(current_index + 6, len(self.uncompleted_cases))): 
+            prefix = self.uncompleted_cases[case].completed_tasks
+            embedded_prefix_next = self.embed_prefix(prefix)
+            next_case_embeddings.append(embedded_prefix_next)
+
+        embedding_size = 10
+
+        while len(next_case_embeddings) < 5:
+            next_case_embeddings.append(np.zeros(embedding_size))
+
+        prefix_next_cases = np.concatenate(next_case_embeddings)
+
+
+
+        return np.array(resources_available + resources_assigned + task_types_num + embedded_prefix + prefix_next_cases)
 
     def define_action_masks(self):
         action_masks = [True if resource in self.available_resources and task in [_task.task_type for _task in self.available_tasks] else False 
