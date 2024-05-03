@@ -66,13 +66,15 @@ class Task:
 
 
 class Simulator:    
-    def __init__(self, running_time, planner, config_type, reward_function=None, write_to=None):
+    def __init__(self, running_time, planner, config_type, allow_postponing=True, reward_function=None, write_to=None):
         self.config_type = config_type
         with open(os.path.join(sys.path[0], "config.txt"), "r") as f:
             data = f.read()
 
         config = json.loads(data)        
         config = config[config_type]
+        self.allow_postponing = allow_postponing
+        self.action_mask_limit = 1 if self.allow_postponing == True else 0
             
         self.running_time = running_time
         self.status = "RUNNING"
@@ -104,16 +106,17 @@ class Simulator:
         self.resource_pools = config['resource_pools']
         self.transitions = config['transitions']
 
-        # self.task_types = sorted(list(self.task_types))
-        # self.resources = sorted(list(set(np.hstack(list(self.resources))))) 
-
         self.planner = planner 
         if self.planner != None: self.planner.resource_pools = self.resource_pools
 
         self.resource_total_busy_time = {resource:0 for resource in self.resources}
         self.resource_last_start = {resource:0 for resource in self.resources}
 
-        # Reinforcement learning parameters
+        # Variables for tracking case assignments
+        self.starting_case_id = 0
+        self.current_case_id = 0
+
+        # Reinforcement learning variables
         self.input = [resource + '_availability' for resource in self.resources] + \
                      [resource + '_to_task' for resource in self.resources] + \
                      [task_type for task_type in self.task_types if task_type != 'Start'] 
@@ -140,7 +143,6 @@ class Simulator:
     def generate_initial_task(self, case_id):
         return self.generate_next_task(Task(self.now, case_id, 'Start'))
     
-
     def generate_next_task(self, current_task, predict=False):
         #print(current_task.task_type, self.transitions[current_task.task_type])
         if predict == False: case = self.uncompleted_cases[current_task.case_id]
@@ -191,14 +193,12 @@ class Simulator:
             #print([task.task_type for task in next_tasks])
             return next_tasks
 
-
     def generate_case(self):
         case = Case(self.now)
         self.uncompleted_cases[case.id] = case
         return case
 
     def process_assignment(self, assignment):
-
         if self.reward_function == 'task':
             self.current_reward += self.reward_task_start  
             self.total_reward += self.reward_task_start
@@ -228,7 +228,17 @@ class Simulator:
         embedded_prefix = np.mean([model.wv[task] for task in prefix], axis=0)
         return embedded_prefix
         
-    def get_state(self):
+    def get_state(self, considered_cases=None, nr_other_cases=5):
+        if considered_cases != None:
+            case_ids = sorted(list(self.uncompleted_cases.keys())) # Sort as the dictionary values or unordered
+            current_case_id = case_ids[considered_cases] # If no cases have been considered, the first case is the current case
+            nr_other_cases = min(nr_other_cases - considered_cases, len(case_ids) - 1) # used to loop over nr_other_cases.
+            # Get all case ids starting from the starting_case_id to the starting_case_id + nr_other_cases. Exclude considered cases
+            other_case_ids = [case_id for case_id in case_ids[considered_cases:considered_cases + nr_other_cases]]
+            
+            # !! Als nr_other_cases = 0, dan kun je de next_state actie masken. Hierdoor zal de volgende step de waarde self.considered_cases resetten.
+            
+
         ### Resource binary, busy time, assigned to + nr of each task
         resources_available = [1 if x in self.available_resources else 0 for x in self.resources]
 
@@ -247,7 +257,8 @@ class Simulator:
 
         #in case alle task assigments bekijken, nadat alle zijn bekeken doorgaan naar volgende case.
 
-
+        # !! self.uncompleted_cases is een dictionary waar de case id de key is en de value een case object is
+        # Op basis van de case.id kun je de volgorde van de cases bepalen (e.g. self.uncompleted_cases.keys() geeft een lijst van case id's terug)
         if 1 in self.uncompleted_cases: #Case als argument in get_state zodat dit dynamisch wordt
             case = self.uncompleted_cases[1]
             prefix = case.completed_tasks
@@ -275,8 +286,10 @@ class Simulator:
 
     def define_action_masks(self):
         action_masks = [True if resource in self.available_resources and task in [_task.task_type for _task in self.available_tasks] else False 
-                for resource, task in self.output[:-1]] + [True]
-        return action_masks
+                for resource, task in self.output[:-1]]
+        postpone_mask = [True] if self.allow_postponing else []
+        # next_step_mask = ....
+        return action_masks + postpone_mask # + next_step_mask
 
     def run(self):
         while self.now <= self.running_time:
