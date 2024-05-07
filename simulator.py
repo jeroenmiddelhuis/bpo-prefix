@@ -74,7 +74,7 @@ class Simulator:
         config = json.loads(data)        
         config = config[config_type]
         self.allow_postponing = allow_postponing
-        self.action_mask_limit = 1 if self.allow_postponing == True else 0
+        self.action_mask_limit = 2 if self.allow_postponing == True else 1
             
         self.running_time = running_time
         self.status = "RUNNING"
@@ -120,7 +120,7 @@ class Simulator:
         self.input = [resource + '_availability' for resource in self.resources] + \
                      [resource + '_to_task' for resource in self.resources] + \
                      [task_type for task_type in self.task_types if task_type != 'Start'] 
-        self.output = [(resource, task) for task in self.task_types[1:] for resource in self.resources if resource in self.resource_pools[task]] + ['Postpone']
+        self.output = [(resource, task) for task in self.task_types[1:] for resource in self.resources if resource in self.resource_pools[task]] + ['Postpone','Next_case']
 
         self.reward_function = reward_function
         self.write_to = write_to
@@ -259,19 +259,21 @@ class Simulator:
 
         # !! self.uncompleted_cases is een dictionary waar de case id de key is en de value een case object is
         # Op basis van de case.id kun je de volgorde van de cases bepalen (e.g. self.uncompleted_cases.keys() geeft een lijst van case id's terug)
-        if 1 in self.uncompleted_cases: #Case als argument in get_state zodat dit dynamisch wordt
-            case = self.uncompleted_cases[1]
-            prefix = case.completed_tasks
-            embedded_prefix = self.embed_prefix(prefix)
+        
+        case = self.uncompleted_cases[current_case_id]
+        prefix = case.completed_tasks
+        embedded_prefix = self.embed_prefix(prefix)
+        
 
         sorted_case_ids = sorted(self.uncompleted_cases.keys())
-        current_index = sorted_case_ids.index(current_case_id) #zelfde hier, aanpassen naar current case id
+        current_index = sorted_case_ids.index(current_case_id) 
 
-        next_case_embeddings = [] #Zelfde hier, aanpassen naar current case id
-        for case in range(current_index + 1, min(current_index + 6, len(self.uncompleted_cases))): 
-            prefix = self.uncompleted_cases[case].completed_tasks
-            embedded_prefix_next = self.embed_prefix(prefix)
-            next_case_embeddings.append(embedded_prefix_next)
+        next_case_embeddings = []
+        for i in range(considered_cases + 1, considered_cases + 1 + nr_other_cases):
+            if i < len(case_ids):  # Ensure the index exists
+                case_prefix = self.uncompleted_cases[case_ids[i]].completed_tasks
+                embedded_prefix_next = self.embed_prefix(case_prefix)
+                next_case_embeddings.append(embedded_prefix_next)
 
         embedding_size = 10
 
@@ -280,16 +282,16 @@ class Simulator:
 
         prefix_next_cases = np.concatenate(next_case_embeddings)
 
-
-
         return np.array(resources_available + resources_assigned + task_types_num + embedded_prefix + prefix_next_cases)
 
-    def define_action_masks(self):
+    def define_action_masks(self, considered_cases=None):
         action_masks = [True if resource in self.available_resources and task in [_task.task_type for _task in self.available_tasks] else False 
                 for resource, task in self.output[:-1]]
         postpone_mask = [True] if self.allow_postponing else []
-        # next_step_mask = ....
-        return action_masks + postpone_mask # + next_step_mask
+        next_case_mask = [True] if self.considered_cases < len(self.uncompleted_cases) - 1 else [False]  
+
+        return action_masks + postpone_mask + next_case_mask
+
 
     def run(self):
         while self.now <= self.running_time:
