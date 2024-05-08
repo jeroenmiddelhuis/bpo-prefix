@@ -14,7 +14,7 @@ class BPOEnv(Env):
         self.nr_postpone = 0
         self.config_type = config_type
         self.allow_postponing = allow_postponing
-        self.action_mask_limit = 1 if self.allow_postponing else 0
+        self.action_mask_limit = 1 if self.allow_postponing else 0 #### !! Deze aanpassen als je de next_case actie wilt gebruiken
 
         self.reward_function = reward_function
         self.postpone_penalty = postpone_penalty
@@ -69,6 +69,9 @@ class BPOEnv(Env):
             available_resources = [resource for resource in self.simulator.available_resources]
             available_resources_compare = [resource for resource in available_resources]
             # Keep running the simulator until the state changes or the termination condition is reached
+
+            # !! Deze zul je ook aan moeten passen. 'sum(self.simulator.define_action_masks()) <= self.action_mask_limit' is de voorwaarde voor de simulatie te stoppen
+            # Als je next_case maskt, dan moet je deze aanpassen naar 'sum(self.simulator.define_action_masks()) <= self.action_mask_limit - 1'??? -> check
             while (self.simulator.status != 'FINISHED') and ((sum(self.simulator.define_action_masks()) <= self.action_mask_limit) or (unassigned_tasks == unassigned_tasks_compare and \
                     available_resources == available_resources_compare)):
                 self.simulator.run() # Run until next decision epoch
@@ -82,6 +85,8 @@ class BPOEnv(Env):
         if self.simulator.status == 'FINISHED':
             return self.simulator.get_state(self.considered_cases, self.nr_other_cases), reward, True, {}, {}
         else:
+            # !! Je moet goed checken of de juiste state wordt geturned. Als je alles werkend hebt kun je per stap de state + alle cases printen en kijken of dit klopt.
+            # In get_state kun je ook de specifieke cases printen om te kijken of het de juiste zijn.
             return self.simulator.get_state(self.considered_cases, self.nr_other_cases), reward, False, {}, {}
 
 

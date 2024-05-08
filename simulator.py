@@ -74,7 +74,7 @@ class Simulator:
         config = json.loads(data)        
         config = config[config_type]
         self.allow_postponing = allow_postponing
-        self.action_mask_limit = 2 if self.allow_postponing == True else 1
+        self.action_mask_limit = 2 if self.allow_postponing == True else 1 # !! Deze aanpassen als je de next_case actie wilt gebruiken
             
         self.running_time = running_time
         self.status = "RUNNING"
@@ -268,6 +268,9 @@ class Simulator:
         sorted_case_ids = sorted(self.uncompleted_cases.keys())
         current_index = sorted_case_ids.index(current_case_id) 
 
+        # !! Houdt je ook rekenking met een sliding window? Als er minder dan X cases zijn, dan moet je nog wel de vector vullen (met nullen bijvoorbeeld)
+        # Wil je de cases dat je bekijkt hetzelfde houden? Dus je begint bij case 1 en je bekijkt cases 2-5. Actie next_case -> bekijk je dan case 3-5 of 3-6?
+        # In het tweede geval kun je in een hele lange loop terecht komen.
         next_case_embeddings = []
         for i in range(considered_cases + 1, considered_cases + 1 + nr_other_cases):
             if i < len(case_ids):  # Ensure the index exists
@@ -288,8 +291,12 @@ class Simulator:
         action_masks = [True if resource in self.available_resources and task in [_task.task_type for _task in self.available_tasks] else False 
                 for resource, task in self.output[:-1]]
         postpone_mask = [True] if self.allow_postponing else []
-        next_case_mask = [True] if self.considered_cases < len(self.uncompleted_cases) - 1 else [False]  
-
+        if next_case_mask != None:
+             ## !! hier moet je een constante hebben die zegt hoeveel cases je maximaal wilt bekijken
+             # Bijvoorbeeld 5 cases (zie get_state functie). Je kan deze variabele ook als input van de class meegeven
+            next_case_mask = [True] if considered_cases < min(len(self.uncompleted_cases) - 1, nr_other_cases) else [False]
+        else:
+            next_case_mask = [False] if 'Next_case' in self.output else [] # If next_case action is not there, return empty list
         return action_masks + postpone_mask + next_case_mask
 
 
