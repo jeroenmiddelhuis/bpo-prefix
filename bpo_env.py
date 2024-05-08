@@ -41,7 +41,7 @@ class BPOEnv(Env):
                                             high=highs,
                                             shape=(len(self.simulator.input),), dtype=np.float64) #observation space is the cartesian product of resources and tasks
         
-        # spaces.Discrete returns a number between 0 and len(self.simulator.output)
+        ## spaces.Discrete returns a number between 0 and len(self.simulator.output)
         self.action_space = spaces.Discrete(len(self.simulator.output)) # Action space is all possible assignments + postpone action
 
     def step(self, action):
