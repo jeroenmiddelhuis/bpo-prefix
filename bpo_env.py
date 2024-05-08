@@ -14,7 +14,7 @@ class BPOEnv(Env):
         self.nr_postpone = 0
         self.config_type = config_type
         self.allow_postponing = allow_postponing
-        self.action_mask_limit = 1 if self.allow_postponing else 0 #### !! Deze aanpassen als je de next_case actie wilt gebruiken
+        self.action_mask_limit = 1 if self.allow_postponing else 0
 
         self.reward_function = reward_function
         self.postpone_penalty = postpone_penalty
@@ -55,8 +55,8 @@ class BPOEnv(Env):
             self.considered_cases = 0
             assignment = (assignment[0], (next((x for x in self.simulator.available_tasks if x.task_type == assignment[1]), None)))
             self.simulator.process_assignment(assignment)
-            while (sum(self.simulator.define_action_masks()) <= self.action_mask_limit) and (self.simulator.status != 'FINISHED'):
-                self.simulator.run()
+            while (sum(self.simulator.define_action_masks(self.considered_cases)) <= self.action_mask_limit) and (self.simulator.status != 'FINISHED'):
+                self.simulator.run(considered_cases=self.considered_cases)
         elif assignment == 'Next_case':
             self.considered_cases += 1
         elif assignment == 'Postpone': # Postpone
@@ -69,12 +69,9 @@ class BPOEnv(Env):
             available_resources = [resource for resource in self.simulator.available_resources]
             available_resources_compare = [resource for resource in available_resources]
             # Keep running the simulator until the state changes or the termination condition is reached
-
-            # !! Deze zul je ook aan moeten passen. 'sum(self.simulator.define_action_masks()) <= self.action_mask_limit' is de voorwaarde voor de simulatie te stoppen
-            # Als je next_case maskt, dan moet je deze aanpassen naar 'sum(self.simulator.define_action_masks()) <= self.action_mask_limit - 1'??? -> check
-            while (self.simulator.status != 'FINISHED') and ((sum(self.simulator.define_action_masks()) <= self.action_mask_limit) or (unassigned_tasks == unassigned_tasks_compare and \
+            while (self.simulator.status != 'FINISHED') and ((sum(self.simulator.define_action_masks(self.considered_cases)) <= self.action_mask_limit) or (unassigned_tasks == unassigned_tasks_compare and \
                     available_resources == available_resources_compare)):
-                self.simulator.run() # Run until next decision epoch
+                self.simulator.run(self.considered_cases) # Run until next decision epoch
 
                 unassigned_tasks_compare = [sum([1 if task.task_type == el else 0 for task in self.simulator.available_tasks]) for el in self.simulator.task_types]
                 available_resources_compare = [resource for resource in self.simulator.available_resources]
@@ -85,8 +82,6 @@ class BPOEnv(Env):
         if self.simulator.status == 'FINISHED':
             return self.simulator.get_state(self.considered_cases, self.nr_other_cases), reward, True, {}, {}
         else:
-            # !! Je moet goed checken of de juiste state wordt geturned. Als je alles werkend hebt kun je per stap de state + alle cases printen en kijken of dit klopt.
-            # In get_state kun je ook de specifieke cases printen om te kijken of het de juiste zijn.
             return self.simulator.get_state(self.considered_cases, self.nr_other_cases), reward, False, {}, {}
 
 
@@ -109,8 +104,8 @@ class BPOEnv(Env):
                       reward_function=self.reward_function, postpone_penalty=self.postpone_penalty, 
                       write_to=self.write_to)
         
-        while (sum(self.simulator.define_action_masks()) <= self.action_mask_limit):
-            self.simulator.run() # Run the simulator to get to the first decision epoch
+        while (sum(self.simulator.define_action_masks(self.considered_cases)) <= self.action_mask_limit):
+            self.simulator.run(self.considered_cases) # Run the simulator to get to the first decision epoch
 
         return self.simulator.get_state(self.considered_cases, self.nr_other_cases), {}
 
@@ -120,4 +115,4 @@ class BPOEnv(Env):
 
 
     def action_masks(self) -> List[bool]:
-        return self.simulator.define_action_masks()
+        return self.simulator.define_action_masks(self.considered_cases)
