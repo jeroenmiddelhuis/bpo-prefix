@@ -46,7 +46,8 @@ class Case:
     def complete_task(self, task):
         self.uncompleted_tasks.remove(task)
         self.completed_tasks.append(task)
-
+        
+    #Embedding hier toevoegen.
 
 class Task:
     _id = 0
@@ -74,7 +75,7 @@ class Simulator:
         config = json.loads(data)        
         config = config[config_type]
         self.allow_postponing = allow_postponing
-        self.action_mask_limit = 2 if self.allow_postponing == True else 1 # !! Deze aanpassen als je de next_case actie wilt gebruiken
+        self.action_mask_limit = 1 if self.allow_postponing == True else 0 # !! Deze aanpassen als je de next_case actie wilt gebruiken
             
         self.running_time = running_time
         self.status = "RUNNING"
@@ -210,8 +211,6 @@ class Simulator:
             self.available_resources.remove(assignment[0])
             self.available_tasks.remove(assignment[1])
 
-            self.state = self.get_state()
-
             self.resource_last_start[assignment[0]] = self.now
             pt = self.sample_processing_time(assignment[0], assignment[1].task_type)
             self.events.append(Event(EventType.TASK_COMPLETE, self.now + pt, assignment[1], assignment[0]))
@@ -232,7 +231,7 @@ class Simulator:
         if considered_cases != None:
             case_ids = sorted(list(self.uncompleted_cases.keys())) # Sort as the dictionary values or unordered
             current_case_id = case_ids[considered_cases] # If no cases have been considered, the first case is the current case
-            nr_other_cases = min(nr_other_cases - considered_cases, len(case_ids) - 1) # used to loop over nr_other_cases.
+            nr_other_cases = min(nr_other_cases, len(case_ids) - 1) # used to loop over nr_other_cases.
             # Get all case ids starting from the starting_case_id to the starting_case_id + nr_other_cases. Exclude considered cases
             other_case_ids = [case_id for case_id in case_ids[considered_cases:considered_cases + nr_other_cases]]
             
@@ -291,16 +290,15 @@ class Simulator:
         action_masks = [True if resource in self.available_resources and task in [_task.task_type for _task in self.available_tasks] else False 
                 for resource, task in self.output[:-1]]
         postpone_mask = [True] if self.allow_postponing else []
-        if next_case_mask != None:
-             ## !! hier moet je een constante hebben die zegt hoeveel cases je maximaal wilt bekijken
-             # Bijvoorbeeld 5 cases (zie get_state functie). Je kan deze variabele ook als input van de class meegeven
-            next_case_mask = [True] if considered_cases < min(len(self.uncompleted_cases) - 1, nr_other_cases) else [False]
-        else:
-            next_case_mask = [False] if 'Next_case' in self.output else [] # If next_case action is not there, return empty list
+        
+        next_case_mask = [True] if considered_cases < len(self.uncompleted_cases) - 1 else [False]
+        #else:
+            #next_case_mask = [False] if 'Next_case' in self.output else [] # If next_case action is not there, return empty list
+        #
         return action_masks + postpone_mask + next_case_mask
 
 
-    def run(self):
+    def run(self, considered_cases=None):
         while self.now <= self.running_time:
             event = self.events.pop(0)
             self.now = event.moment
@@ -318,7 +316,11 @@ class Simulator:
                 if event.event_type == EventType.PLAN_TASKS:
                     if self.planner == None: # DRL algorithm handles processing of assignments (training and inference)
                         # there only is an assignment if there are free resources and tasks
-                        if sum(self.define_action_masks()) > 1:
+                        if considered_cases == len(self.uncompleted_cases) - 1:
+                            limit = self.action_mask_limit
+                        else:
+                            limit = self.action_mask_limit + 1
+                        if sum(self.define_action_masks(considered_cases)) > limit: 
                             break # Return to gym environment
                     else: #at inference time, we call the plan function of the planner
                         assignments = self.planner.plan(self.available_tasks, self.available_resources, self.resource_pools)
