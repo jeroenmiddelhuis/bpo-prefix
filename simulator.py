@@ -120,7 +120,11 @@ class Simulator:
         # Reinforcement learning variables
         self.input = [resource + '_availability' for resource in self.resources] + \
                      [resource + '_to_task' for resource in self.resources] + \
-                     [task_type for task_type in self.task_types if task_type != 'Start'] 
+                     [task_type for task_type in self.task_types if task_type != 'Start'] + \
+                        [f'{i}' for i in range(60)] # 60 is the size of prefix embeddings
+                        + activities voor deze case
+                        
+                    
         self.output = [(resource, task) for task in self.task_types[1:] for resource in self.resources if resource in self.resource_pools[task]] + ['Postpone','Next_case']
 
         self.reward_function = reward_function
@@ -287,8 +291,8 @@ class Simulator:
         return np.array(resources_available + resources_assigned + task_types_num + embedded_prefix + prefix_next_cases)
 
     def define_action_masks(self, considered_cases=None):
-        action_masks = [True if resource in self.available_resources and task in [_task.task_type for _task in self.available_tasks] else False 
-                for resource, task in self.output[:-1]]
+        action_masks = [True if resource in self.available_resources and task in [_task.task_type for _task in self.available_tasks if _task.id in self.uncompleted_cases] else False 
+                for resource, task in self.output[:-2]]
         postpone_mask = [True] if self.allow_postponing else []
         
         next_case_mask = [True] if considered_cases < len(self.uncompleted_cases) - 1 else [False]
