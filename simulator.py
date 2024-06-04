@@ -121,10 +121,9 @@ class Simulator:
         self.input = [resource + '_availability' for resource in self.resources] + \
                      [resource + '_to_task' for resource in self.resources] + \
                      [task_type for task_type in self.task_types if task_type != 'Start'] + \
-                        [f'{i}' for i in range(60)] # 60 is the size of prefix embeddings
-                        + activities voor deze case
-                        
-                    
+                     [f'prefix_embedding_{i}' for i in range(60)] + \
+                     ['current_case_task_' + str(i) + '_available' for i in range(len(self.uncompleted_tasks))]                
+                
         self.output = [(resource, task) for task in self.task_types[1:] for resource in self.resources if resource in self.resource_pools[task]] + ['Postpone','Next_case']
 
         self.reward_function = reward_function
@@ -241,6 +240,7 @@ class Simulator:
             
             # !! Als nr_other_cases = 0, dan kun je de next_state actie masken. Hierdoor zal de volgende step de waarde self.considered_cases resetten.
             
+        case = self.uncompleted_cases[current_case_id]
 
         ### Resource binary, busy time, assigned to + nr of each task
         resources_available = [1 if x in self.available_resources else 0 for x in self.resources]
@@ -253,17 +253,20 @@ class Simulator:
                 #resources_busy_time[resource_index] = self.now - event.task.start_time
                 resources_assigned[resource_index] = self.task_types.index(event.task.task_type)/(len(self.task_types)-1)
 
+        current_case_available = [1 if task.task_type in case.uncompleted_tasks else 0 for task in self.available_tasks] #start?
+
         if len(self.available_tasks) > 0:
             task_types_num = [min(1.0, sum([1.0 if task.task_type == el else 0.0 for task in self.available_tasks])/100) for el in self.task_types if el != 'Start'] # len(self.available_tasks)
         else:
             task_types_num = [0.0 for el in self.task_types if el != 'Start']
 
+        
         #in case alle task assigments bekijken, nadat alle zijn bekeken doorgaan naar volgende case.
 
         # !! self.uncompleted_cases is een dictionary waar de case id de key is en de value een case object is
         # Op basis van de case.id kun je de volgorde van de cases bepalen (e.g. self.uncompleted_cases.keys() geeft een lijst van case id's terug)
         
-        case = self.uncompleted_cases[current_case_id]
+        
         prefix = case.completed_tasks
         embedded_prefix = self.embed_prefix(prefix)
         
@@ -288,7 +291,7 @@ class Simulator:
 
         prefix_next_cases = np.concatenate(next_case_embeddings)
 
-        return np.array(resources_available + resources_assigned + task_types_num + embedded_prefix + prefix_next_cases)
+        return np.array(resources_available + resources_assigned  + task_types_num + embedded_prefix + prefix_next_cases + current_case_available)
 
     def define_action_masks(self, considered_cases=None):
         action_masks = [True if resource in self.available_resources and task in [_task.task_type for _task in self.available_tasks if _task.id in self.uncompleted_cases] else False 
