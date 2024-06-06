@@ -6,7 +6,6 @@ from typing import List
 import pandas as pd
 from sb3_contrib import MaskablePPO
 
-
 class Planner(ABC):
     """Abstract class that all planners must implement."""
 

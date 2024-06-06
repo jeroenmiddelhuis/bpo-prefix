@@ -23,6 +23,8 @@ from stable_baselines3.common.vec_env import DummyVecEnv, SubprocVecEnv
 from callbacks import SaveOnBestTrainingRewardCallback, EvalPolicyCallback
 from callbacks import custom_schedule, linear_schedule
 
+import warnings
+warnings.filterwarnings("ignore")
 
 # Input parameters
 nr_layers = 2

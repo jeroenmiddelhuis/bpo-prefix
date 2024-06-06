@@ -231,7 +231,7 @@ class Simulator:
         
     def embed_prefix(self, prefix):
         model = Word2Vec.load('tasks_word2vec.model')
-        embedded_prefix = np.mean([model.wv[task] for task in prefix], axis=0).tolist()
+        embedded_prefix = np.mean([model.wv[task.task_type] for task in prefix], axis=0).tolist()
         return embedded_prefix
     
     def get_state(self, considered_cases=None, nr_other_cases=5):
@@ -302,16 +302,17 @@ class Simulator:
 
         return state
 
-    def define_action_masks(self, considered_cases=None):
+    def define_action_masks(self, considered_cases=0):
         action_masks = [True if resource in self.available_resources and task in [_task.task_type for _task in self.available_tasks if _task.id in self.uncompleted_cases] else False 
                 for resource, task in self.output[:-2]]
         postpone_mask = [True] if self.allow_postponing else []
-        
+
         next_case_mask = [True] if considered_cases < len(self.uncompleted_cases) - 1 else [False]
         #else:
             #next_case_mask = [False] if 'Next_case' in self.output else [] # If next_case action is not there, return empty list
         #
-        return action_masks + postpone_mask + next_case_mask
+        mask = action_masks + postpone_mask + next_case_mask
+        return mask
 
 
     def run(self, considered_cases=None):
@@ -436,7 +437,7 @@ class Simulator:
                 self.sumx += cycle_time
                 self.sumxx += cycle_time * cycle_time
                 self.sumw += 1
-
+            print(self.status, self.now, self.running_time)
             print(f'Uncompleted cases: {len(self.uncompleted_cases)}')
             print(f'Resource utilisation: {[(resource, busy_time/self.running_time) for resource, busy_time in self.resource_total_busy_time.items()]}')
             print(f'Total reward: {self.total_reward}. Total CT: {self.sumx}')
@@ -450,7 +451,7 @@ class Simulator:
                 if self.planner != None:
                     with open(self.write_to + f'\\{self.planner}_{self.config_type}.txt', "a") as file:
                         file.write(f"{len(self.uncompleted_cases)},{resource_str}{self.total_reward},{self.sumx/self.sumw},{np.sqrt(self.sumxx / self.sumw - self.sumx / self.sumw * self.sumx / self.sumw)}\n")
-
+            print(self.now)
             return len(self.uncompleted_cases),self.total_reward,self.sumx/self.sumw,np.sqrt(self.sumxx / self.sumw - self.sumx / self.sumw * self.sumx / self.sumw)
         
 
