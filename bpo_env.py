@@ -18,7 +18,7 @@ class BPOEnv(Env):
         self.nr_postpone = 0
         self.config_type = config_type
         self.allow_postponing = allow_postponing
-        self.action_mask_limit = 2 if self.allow_postponing else 1
+        self.action_mask_limit = 1 if self.allow_postponing else 0
 
         self.reward_function = reward_function
         self.postpone_penalty = postpone_penalty
@@ -51,6 +51,7 @@ class BPOEnv(Env):
 
     def step(self, action):
         self.step_count += 1
+        
         if self._print:
 
             print(f'\n step: {self.step_count} @ time: {self.simulator.now}')
@@ -64,7 +65,7 @@ class BPOEnv(Env):
         # 3 Return reward
         # Assign one resources per iteration. If possible, another is assigned in next step without advancing simulator
         assignment = self.simulator.output[action] # (Resource X, Task Y)
-        next_case_mask = 1 if self.considered_cases < len(self.simulator.uncompleted_cases) - 1 else 0
+        next_case_mask = 1 if self.considered_cases < len(self.simulator.uncompleted_cases) - 2 else 0
         action_mask_limit = self.action_mask_limit + next_case_mask
         if self._print: print(f"Assignment: {assignment}")
         #print(assignment, self.simulator.state)
@@ -110,8 +111,7 @@ class BPOEnv(Env):
 
 
     def reset(self, seed: int | None = None):
-        """Resets the environment to an initial state and returns an initial
-        observation.
+        """Resets the environment to an initial state and returns an initial observation.
 
         Note that this function should not reset the environment's random
         number generator(s); random variables in the environment's state should
@@ -124,26 +124,44 @@ class BPOEnv(Env):
         """
 
         print("-------Resetting environment-------")
-        print(self.step_count)
+        print(f"Step count before reset: {self.step_count}")
+        print(self.action_masks())
+        unassigned_tasks = [sum([1 if task.task_type == el else 0 for task in self.simulator.available_tasks]) for el in self.simulator.task_types]
+        print(f"Unassigned Tasks (before): {unassigned_tasks}")
+        # Reinitialize the environment
         self.__init__(self.running_time, self.config_type, allow_postponing=self.allow_postponing, 
-                      reward_function=self.reward_function, postpone_penalty=self.postpone_penalty, 
-                      write_to=self.write_to)
+                    reward_function=self.reward_function, postpone_penalty=self.postpone_penalty, 
+                    write_to=self.write_to)
         
         next_case_mask = 1 if self.considered_cases < len(self.simulator.uncompleted_cases) - 1 else 0
         action_mask_limit = self.action_mask_limit + next_case_mask
 
-        unassigned_tasks =  [sum([1 if task.task_type == el else 0 for task in self.simulator.available_tasks]) for el in self.simulator.task_types] 
+        # Get initial tasks and resources state
+        unassigned_tasks = [sum([1 if task.task_type == el else 0 for task in self.simulator.available_tasks]) for el in self.simulator.task_types]
         unassigned_tasks_compare = [task_sum for task_sum in unassigned_tasks]
-        #print(unassigned_tasks)
         available_resources = [resource for resource in self.simulator.available_resources]
         available_resources_compare = [resource for resource in available_resources]
-        # Keep running the simulator until the state changes or the termination condition is reached
-        while (self.simulator.status != 'FINISHED') and ((sum(self.simulator.define_action_masks(self.considered_cases)) <= action_mask_limit) or (unassigned_tasks == unassigned_tasks_compare and \
-                available_resources == available_resources_compare)):
-            self.simulator.run(self.considered_cases) # Run until next decision epoch
 
+        # Keep running the simulator until the state changes or the termination condition is reached
+        while (self.simulator.status != 'FINISHED') and ((sum(self.simulator.define_action_masks(self.considered_cases)) <= action_mask_limit) or 
+                                                        (unassigned_tasks == unassigned_tasks_compare and available_resources == available_resources_compare)):
+            print(f"Simulator Status: {self.simulator.status}")
+            print(f"Action Masks: {self.simulator.define_action_masks(self.considered_cases)}")
+            #print(f"Unassigned Tasks (before): {unassigned_tasks}")
+            print(f"Available Resources (before): {available_resources}")
+
+            self.simulator.run(self.considered_cases)  # Run until next decision epoch
+
+            # Update task and resource states for comparison
             unassigned_tasks_compare = [sum([1 if task.task_type == el else 0 for task in self.simulator.available_tasks]) for el in self.simulator.task_types]
             available_resources_compare = [resource for resource in self.simulator.available_resources]
+
+            print(f"Unassigned Tasks (after): {unassigned_tasks_compare}")
+            print(f"Available Resources (after): {available_resources_compare}")
+
+        print("-------Environment reset-------")
+        return self.simulator.get_state(self.considered_cases, self.nr_other_cases), {}
+
 
 
 
@@ -152,7 +170,7 @@ class BPOEnv(Env):
         #     print(next_case_mask)
         #     print(action_mask_limit, self.considered_cases, len(self.simulator.uncompleted_cases))
         #     self.simulator.run(self.considered_cases) # Run the simulator to get to the first decision epoch
-
+        print("-------Environment reset-------")
         return self.simulator.get_state(self.considered_cases, self.nr_other_cases), {}
 
 

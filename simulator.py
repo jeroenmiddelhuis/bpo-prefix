@@ -75,7 +75,7 @@ class Simulator:
         config = json.loads(data)        
         config = config[config_type]
         self.allow_postponing = allow_postponing
-        self.action_mask_limit = 1 if self.allow_postponing == True else 0 # !! Deze aanpassen als je de next_case actie wilt gebruiken
+        self.action_mask_limit = 2 if self.allow_postponing == True else 1 # !! Deze aanpassen als je de next_case actie wilt gebruiken
             
         self.running_time = running_time
         self.status = "RUNNING"
@@ -145,7 +145,6 @@ class Simulator:
         # init simulation
         self.available_resources = [resource for resource in self.resources]
         self.events.append(Event(EventType.CASE_ARRIVAL, self.sample_interarrival_time()))
-
 
     def generate_initial_task(self, case_id):
         return self.generate_next_task(Task(self.now, case_id, 'Start'))
@@ -231,6 +230,8 @@ class Simulator:
         
     def embed_prefix(self, prefix):
         model = Word2Vec.load('tasks_word2vec.model')
+        if any([type(task) == str for task in prefix]):
+            print(prefix)
         embedded_prefix = np.mean([model.wv[task.task_type] for task in prefix], axis=0).tolist()
         return embedded_prefix
     
@@ -278,7 +279,7 @@ class Simulator:
         for i in range(self.window_size):
             case_index = considered_cases + 1 + i
         if case_index < len(sorted_case_ids):
-            case_prefix = [task.task_type for task in self.uncompleted_cases[sorted_case_ids[case_index]].completed_tasks]
+            case_prefix = [task for task in self.uncompleted_cases[sorted_case_ids[case_index]].completed_tasks]
             if case_prefix:  # Check if case_prefix is not empty
                 embedded_prefix_next = self.embed_prefix(case_prefix)
                 next_case_embeddings[i * self.embedding_size: (i + 1) * self.embedding_size] = embedded_prefix_next
@@ -303,11 +304,11 @@ class Simulator:
         return state
 
     def define_action_masks(self, considered_cases=0):
-        action_masks = [True if resource in self.available_resources and task in [_task.task_type for _task in self.available_tasks if _task.id in self.uncompleted_cases] else False 
+        action_masks = [True if resource in self.available_resources and task in [_task.task_type for _task in self.available_tasks if _task.case_id in self.uncompleted_cases] else False 
                 for resource, task in self.output[:-2]]
         postpone_mask = [True] if self.allow_postponing else []
 
-        next_case_mask = [True] if considered_cases < len(self.uncompleted_cases) - 1 else [False]
+        next_case_mask = [True] if considered_cases < len(self.uncompleted_cases) - 2 else [False]
         #else:
             #next_case_mask = [False] if 'Next_case' in self.output else [] # If next_case action is not there, return empty list
         #
@@ -333,10 +334,10 @@ class Simulator:
                 if event.event_type == EventType.PLAN_TASKS:
                     if self.planner == None: # DRL algorithm handles processing of assignments (training and inference)
                         # there only is an assignment if there are free resources and tasks
-                        if considered_cases == len(self.uncompleted_cases) - 1:
+                        if considered_cases < len(self.uncompleted_cases) - 2:
                             limit = self.action_mask_limit
                         else:
-                            limit = self.action_mask_limit + 1
+                            limit = self.action_mask_limit - 1
                         if sum(self.define_action_masks(considered_cases)) > limit: 
                             break # Return to gym environment
                     else: #at inference time, we call the plan function of the planner
