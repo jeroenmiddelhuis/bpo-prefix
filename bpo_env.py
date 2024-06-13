@@ -65,7 +65,7 @@ class BPOEnv(Env):
         # 3 Return reward
         # Assign one resources per iteration. If possible, another is assigned in next step without advancing simulator
         assignment = self.simulator.output[action] # (Resource X, Task Y)
-        next_case_mask = 1 if self.considered_cases < len(self.simulator.uncompleted_cases) - 2 else 0
+        next_case_mask = 1 if self.considered_cases < len(self.simulator.uncompleted_cases) - 1 else 0
         action_mask_limit = self.action_mask_limit + next_case_mask
         if self._print: print(f"Assignment: {assignment}")
         #print(assignment, self.simulator.state)
@@ -83,6 +83,8 @@ class BPOEnv(Env):
                 self.simulator.run(considered_cases=self.considered_cases)
         elif assignment == 'Next_case':
             self.considered_cases += 1
+            if self.considered_cases >= len(self.simulator.uncompleted_cases):
+                self.considered_cases = 0
             if self._print: print(f"Next case: {self.considered_cases}")
         elif assignment == 'Postpone': # Postpone
             self.considered_cases = 0
@@ -145,10 +147,10 @@ class BPOEnv(Env):
         # Keep running the simulator until the state changes or the termination condition is reached
         while (self.simulator.status != 'FINISHED') and ((sum(self.simulator.define_action_masks(self.considered_cases)) <= action_mask_limit) or 
                                                         (unassigned_tasks == unassigned_tasks_compare and available_resources == available_resources_compare)):
-            print(f"Simulator Status: {self.simulator.status}")
-            print(f"Action Masks: {self.simulator.define_action_masks(self.considered_cases)}")
+            #print(f"Simulator Status: {self.simulator.status}")
+            #print(f"Action Masks: {self.simulator.define_action_masks(self.considered_cases)}")
             #print(f"Unassigned Tasks (before): {unassigned_tasks}")
-            print(f"Available Resources (before): {available_resources}")
+            #print(f"Available Resources (before): {available_resources}")
 
             self.simulator.run(self.considered_cases)  # Run until next decision epoch
 
@@ -156,8 +158,8 @@ class BPOEnv(Env):
             unassigned_tasks_compare = [sum([1 if task.task_type == el else 0 for task in self.simulator.available_tasks]) for el in self.simulator.task_types]
             available_resources_compare = [resource for resource in self.simulator.available_resources]
 
-            print(f"Unassigned Tasks (after): {unassigned_tasks_compare}")
-            print(f"Available Resources (after): {available_resources_compare}")
+            #print(f"Unassigned Tasks (after): {unassigned_tasks_compare}")
+            #print(f"Available Resources (after): {available_resources_compare}")
 
         print("-------Environment reset-------")
         return self.simulator.get_state(self.considered_cases, self.nr_other_cases), {}

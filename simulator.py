@@ -83,6 +83,7 @@ class Simulator:
 
         self.embedding_size = 10
         self.window_size = 5
+        self.model = Word2Vec.load('tasks_word2vec.model')
 
         self.now = 0
         self.events = []
@@ -229,22 +230,13 @@ class Simulator:
         return random.expovariate(1/self.resource_pools[task][resource][0])
         
     def embed_prefix(self, prefix):
-        model = Word2Vec.load('tasks_word2vec.model')
+        #model = self.model
         if any([type(task) == str for task in prefix]):
             print(prefix)
-        embedded_prefix = np.mean([model.wv[task.task_type] for task in prefix], axis=0).tolist()
+        embedded_prefix = np.mean([self.model.wv[task.task_type] for task in prefix], axis=0).tolist()
         return embedded_prefix
     
     def get_state(self, considered_cases=None, nr_other_cases=5):
-        if considered_cases is not None:
-            case_ids = sorted(list(self.uncompleted_cases.keys()))  # Sort as the dictionary values are unordered
-            current_case_id = case_ids[considered_cases]  # If no cases have been considered, the first case is the current case
-            nr_other_cases = min(nr_other_cases, len(case_ids) - 1)  # used to loop over nr_other_cases.
-            # Get all case ids starting from the starting_case_id to the starting_case_id + nr_other_cases. Exclude considered cases
-            other_case_ids = [case_id for case_id in case_ids[considered_cases:considered_cases + nr_other_cases]]
-        
-        case = self.uncompleted_cases[current_case_id]
-
         ### Resource binary, busy time, assigned to + nr of each task
         resources_available = [1 if x in self.available_resources else 0 for x in self.resources]
 
@@ -255,8 +247,6 @@ class Simulator:
                 resource_index = self.resources.index(event.resource)
                 # resources_busy_time[resource_index] = self.now - event.task.start_time
                 resources_assigned[resource_index] = self.task_types.index(event.task.task_type) / (len(self.task_types) - 1)
-
-        current_case_task_nums = [sum([1.0 if task.task_type == el else 0.0 for task in case.uncompleted_tasks]) for el in self.task_types if el != 'Start']
     
         if len(self.available_tasks) > 0:
             task_types_num = [min(1.0, sum([1.0 if task.task_type == el else 0.0 for task in self.available_tasks]) / 100) for el in self.task_types if el != 'Start']
@@ -264,29 +254,49 @@ class Simulator:
             task_types_num = [0.0 for el in self.task_types if el != 'Start']
 
         # Initialize embedded_prefix and prefix_next_cases to zero arrays
+        case_ids = sorted(list(self.uncompleted_cases.keys())) # Sort as the dictionary values are unordered
+        if len(case_ids) == 0:
+            embedded_prefix = np.zeros(self.embedding_size)
+            next_case_embeddings = np.zeros(self.embedding_size * self.window_size)
+            current_case_task_nums = [0 for task_type in self.task_types if task_type != 'Start']
+            state = np.concatenate((
+                resources_available,
+                resources_assigned,
+                task_types_num,
+                embedded_prefix,
+                next_case_embeddings,
+                current_case_task_nums
+            ))
+            return state
         
-        embedded_prefix = np.zeros(self.embedding_size)
+        if considered_cases is not None:
+            if considered_cases >= len(case_ids):
+                considered_cases = 0  # Reset to the first case if out of range
+                
+            current_case_id = case_ids[considered_cases]  # If no cases have been considered, the first case is the current case
+            nr_other_cases = min(nr_other_cases, len(case_ids) - 1)  # used to loop over nr_other_cases.
+            # Get all case ids starting from the starting_case_id to the starting_case_id + nr_other_cases. Exclude considered cases
+            other_case_ids = [case_id for case_id in case_ids[considered_cases:considered_cases + nr_other_cases]]
+            case = self.uncompleted_cases[current_case_id]
+            embedded_prefix = np.zeros(self.embedding_size)
+            prefix = case.completed_tasks
+            if prefix:
+                embedded_prefix = self.embed_prefix(prefix)
+
+        current_case_task_nums = [sum([1.0 if task.task_type == el else 0.0 for task in case.uncompleted_tasks]) for el in self.task_types if el != 'Start']
+
         next_case_embeddings = np.zeros(self.embedding_size * self.window_size)
-        
-        # Embed the prefix of the current case
-        prefix = case.completed_tasks
-        if prefix:
-            embedded_prefix = self.embed_prefix(prefix)
 
         sorted_case_ids = sorted(self.uncompleted_cases.keys())
         current_index = sorted_case_ids.index(current_case_id)
 
         for i in range(self.window_size):
             case_index = considered_cases + 1 + i
-        if case_index < len(sorted_case_ids):
-            case_prefix = [task for task in self.uncompleted_cases[sorted_case_ids[case_index]].completed_tasks]
-            if case_prefix:  # Check if case_prefix is not empty
-                embedded_prefix_next = self.embed_prefix(case_prefix)
-                next_case_embeddings[i * self.embedding_size: (i + 1) * self.embedding_size] = embedded_prefix_next
-            else:
-                next_case_embeddings[i * self.embedding_size: (i + 1) * self.embedding_size] = np.zeros(self.embedding_size)
-        else:
-            next_case_embeddings[i * self.embedding_size: (i + 1) * self.embedding_size] = np.zeros(self.embedding_size)
+            if case_index < len(sorted_case_ids):
+                case_prefix = [task for task in self.uncompleted_cases[sorted_case_ids[case_index]].completed_tasks]
+                if case_prefix:  # Check if case_prefix is not empty
+                    embedded_prefix_next = self.embed_prefix(case_prefix)
+                    next_case_embeddings[i * self.embedding_size: (i + 1) * self.embedding_size] = embedded_prefix_next
 
         state = np.concatenate((
             resources_available,
@@ -308,7 +318,7 @@ class Simulator:
                 for resource, task in self.output[:-2]]
         postpone_mask = [True] if self.allow_postponing else []
 
-        next_case_mask = [True] if considered_cases < len(self.uncompleted_cases) - 2 else [False]
+        next_case_mask = [True] if considered_cases < len(self.uncompleted_cases) - 1 else [False]
         #else:
             #next_case_mask = [False] if 'Next_case' in self.output else [] # If next_case action is not there, return empty list
         #
@@ -334,7 +344,7 @@ class Simulator:
                 if event.event_type == EventType.PLAN_TASKS:
                     if self.planner == None: # DRL algorithm handles processing of assignments (training and inference)
                         # there only is an assignment if there are free resources and tasks
-                        if considered_cases < len(self.uncompleted_cases) - 2:
+                        if considered_cases < len(self.uncompleted_cases) - 1:
                             limit = self.action_mask_limit
                         else:
                             limit = self.action_mask_limit - 1

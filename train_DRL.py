@@ -30,7 +30,7 @@ warnings.filterwarnings("ignore")
 nr_layers = 2
 nr_neurons = 128
 clip_range = 0.2
-n_steps = 12800 #was 25600
+n_steps = 25600 
 batch_size = 256
 lr = 3e-05
 
