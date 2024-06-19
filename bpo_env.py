@@ -51,7 +51,6 @@ class BPOEnv(Env):
 
     def step(self, action):
         self.step_count += 1
-        
         if self._print:
 
             print(f'\n step: {self.step_count} @ time: {self.simulator.now}')
@@ -125,11 +124,11 @@ class BPOEnv(Env):
             observation (object): the initial observation.
         """
 
-        print("-------Resetting environment-------")
-        print(f"Step count before reset: {self.step_count}")
-        print(self.action_masks())
+        #print("-------Resetting environment-------")
+        #print(f"Step count before reset: {self.step_count}")
+        #print(self.action_masks())
         unassigned_tasks = [sum([1 if task.task_type == el else 0 for task in self.simulator.available_tasks]) for el in self.simulator.task_types]
-        print(f"Unassigned Tasks (before): {unassigned_tasks}")
+        #print(f"Unassigned Tasks (before): {unassigned_tasks}")
         # Reinitialize the environment
         self.__init__(self.running_time, self.config_type, allow_postponing=self.allow_postponing, 
                     reward_function=self.reward_function, postpone_penalty=self.postpone_penalty, 

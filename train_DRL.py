@@ -30,7 +30,7 @@ warnings.filterwarnings("ignore")
 nr_layers = 2
 nr_neurons = 128
 clip_range = 0.2
-n_steps = 25600 
+n_steps = 25600 #was 25600
 batch_size = 256
 lr = 3e-05
 
@@ -51,10 +51,10 @@ if __name__ == '__main__':
     print(config_type)
     reward_function = 'cycle_time'
     postpone_penalty = 0
-    time_steps = 2e7 # Total timesteps for training
+    time_steps = 1e6 # Total timesteps for training
     #n_steps = 25600 # Number of steps for each network update
     # Create log dir
-    log_dir = f"./tmp/{config_type}_{int(time_steps)}_{n_steps}/" # Logging training results
+    log_dir = f"./tmp/{config_type}_{int(time_steps)}_{n_steps}_sg/" # Logging training results
 
     os.makedirs(log_dir, exist_ok=True)
 
@@ -101,7 +101,7 @@ if __name__ == '__main__':
     print(env.get_episode_rewards())
     #     print(env.get_episode_times())
 
-    model.save(f'{log_dir}/{config_type}_{running_time}_final')
+    model.save(f'{log_dir}/{config_type}_{running_time}_{time_steps}_size50_final')
 
     #import matplotlib.pyplot as plt
     #plot_results([log_dir], time_steps, results_plotter.X_TIMESTEPS, f"{model_name}")

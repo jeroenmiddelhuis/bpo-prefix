@@ -81,9 +81,9 @@ class Simulator:
         self.status = "RUNNING"
         self.debug = False
 
-        self.embedding_size = 10
+        self.embedding_size = 20
         self.window_size = 5
-        self.model = Word2Vec.load('tasks_word2vec.model')
+        self.model = Word2Vec.load(r'C:\Users\20191955\OneDrive - TU Eindhoven\Desktop\School\Y3Q3\2IOI0\bpo-prefix\tasks_word2vec_parallel_20_sg.model')
 
         self.now = 0
         self.events = []
