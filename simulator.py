@@ -385,7 +385,18 @@ class Simulator:
                             for next_task in next_tasks:
                                 next_task.parallel = True
                                 next_task.parallel_id = event.task.parallel_id
-
+                    elif self.config_type == 'dominic':
+                        if event.task.task_type in ["Start", 'Task A', 'Task B']:                            
+                            next_tasks = self.generate_next_task(event.task)
+                        elif event.task.task_type == 'Task C':
+                            if len([task for task in self.completed_tasks if task.case_id == event.task.case_id and task.task_type in ['Task D', 'Task E']]) == 2:
+                                next_tasks = self.generate_next_task(event.task)
+                        elif event.task.task_type == 'Task D':
+                            if len([task for task in self.completed_tasks if task.case_id == event.task.case_id and task.task_type in ['Task C', 'Task E']]) == 2:
+                                next_tasks = self.generate_next_task(event.task)
+                        elif event.task.task_type == 'Task E':
+                            if len([task for task in self.completed_tasks if task.case_id == event.task.case_id and task.task_type in ['Task C', 'Task D']]) == 2:
+                                next_tasks = self.generate_next_task(event.task)
                     else:
                         # If the completed task is a parallel task and other parallel tasks are still being processed, then wait for completion
                         if event.task.parallel == True:
