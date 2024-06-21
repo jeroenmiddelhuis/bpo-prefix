@@ -47,14 +47,14 @@ if __name__ == '__main__':
     running_time = 5000
     num_cpu = 1
     load_model = False
-    config_type= 'parallel' # Config types as given in config.txt
+    config_type= 'dominic' # Config types as given in config.txt
     print(config_type)
     reward_function = 'cycle_time'
     postpone_penalty = 0
-    time_steps = 1e6 # Total timesteps for training
+    time_steps = 8e6 # Total timesteps for training
     #n_steps = 25600 # Number of steps for each network update
     # Create log dir
-    log_dir = f"./tmp/{config_type}_{int(time_steps)}_{n_steps}_sg/" # Logging training results
+    log_dir = f"./tmp/{config_type}_{int(time_steps)}_{n_steps}_cbow/" # Logging training results
 
     os.makedirs(log_dir, exist_ok=True)
 
@@ -101,7 +101,7 @@ if __name__ == '__main__':
     print(env.get_episode_rewards())
     #     print(env.get_episode_times())
 
-    model.save(f'{log_dir}/{config_type}_{running_time}_{time_steps}_size50_final')
+    model.save(f'{log_dir}/{config_type}_{running_time}_{time_steps}_size50_cbow_final')
 
     #import matplotlib.pyplot as plt
     #plot_results([log_dir], time_steps, results_plotter.X_TIMESTEPS, f"{model_name}")

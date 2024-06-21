@@ -4,16 +4,16 @@ from sb3_contrib import MaskablePPO  # or your chosen algorithm
 from bpo_env import BPOEnv
 
 # Load your trained model
-model_path = r'C:\Users\20191955\OneDrive - TU Eindhoven\Desktop\School\Y3Q3\2IOI0\bpo-prefix\tmp\parallel_1000000_25600_sg\best_model.zip'
+model_path = r'C:\Users\20191955\OneDrive - TU Eindhoven\Desktop\School\Y3Q3\2IOI0\bpo-prefix\tmp\dominic_8000000_25600_cbow\best_model.zip'
 model = MaskablePPO.load(model_path)
 
 # Define your environment
 running_time = 5000  # Set your desired running time
-config_type = 'parallel'  # Set your configuration type
+config_type = 'dominic'  # Set your configuration type
 allow_postponing = True
 reward_function = 'cycle_time'  # Set your reward function
 postpone_penalty = 0  # Set your postpone penalty
-write_to = 'complete_parallel_10_output'  # Set your output directory
+write_to = 'dominic_50_cbow'  # Set your output directory
 
 env = BPOEnv(running_time, config_type, allow_postponing, reward_function, postpone_penalty, write_to)
 state, _ = env.reset()
